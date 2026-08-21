@@ -7,7 +7,7 @@ import {
 import { format, isPast } from 'date-fns';
 import './index.css';
 
-const API_BASE_URL = 'https://aura-auth-api-theta.vercel.app/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aura-auth-api-theta.vercel.app/api';
 
 const copyToClipboard = (text) => {
   navigator.clipboard.writeText(text);
@@ -65,11 +65,18 @@ const Login = ({ setAuthToken }) => {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, machineId: 'admin', deviceId: 'admin', deviceName: 'Admin', platform: 'web', osVersion: '1', machineName: 'Admin' })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
-      if (!data.user.isAdmin) throw new Error('Access denied: Not an admin account');
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        throw new Error(`Server returned an invalid response (${res.status}).`);
+      }
+      if (!res.ok) throw new Error(data?.error || data?.message || 'Login failed');
+      if (!data?.user?.isAdmin) throw new Error('Access denied: Not an admin account');
       setAuthToken(data.token);
-    } catch (err) { setError(err.message); }
+    } catch (err) { 
+      setError(err.message || 'Network or connection error occurred.'); 
+    }
     finally { setLoading(false); }
   };
   return (
@@ -200,10 +207,10 @@ const CreateUser = ({ token }) => {
         body: JSON.stringify(formData)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create user');
       setCreated(data.user);
       setFormData({ name: '', email: '', maxDevices: 2, singleActiveSession: false, isTrial: false, trialRenderLimit: 5 });
-    } catch (err) { alert(err.message); }
+    } catch (err) { alert(err.message || 'An unexpected error occurred'); }
     finally { setLoading(false); }
   };
   return (
@@ -276,9 +283,9 @@ const UserDetails = ({ token }) => {
         body: JSON.stringify({ userId: id, ...payload })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data?.error || data?.message || 'Action failed');
       alert(data.message); fetchUser(); return true;
-    } catch (err) { alert(err.message); return false; }
+    } catch (err) { alert(err.message || 'An unexpected error occurred'); return false; }
   };
 
   const deleteUserCall = async () => {
